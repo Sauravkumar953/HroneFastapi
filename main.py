@@ -92,10 +92,34 @@ def list_orders(
     query = {"user_id": userid}
 
     # Query database with pagination
-    cursor = orders_collection.find(query).sort("_id").skip(offset).limit(limit)
+    cursor = orders_collection.find(query,{"userId":0}).sort("_id").skip(offset).limit(limit)
     orders = []
     for order in cursor:
-        order["_id"] = str(order["_id"])  # Convert ObjectId to string
+        order["_id"] = str(order["_id"])
+        enriched_items = []
+
+        for item in order.get("items", []):
+            try:
+                product_id = ObjectId(item["productId"])
+                product = products_collection.find_one({"_id": product_id},{"price":0,"sizes":0})
+                if product:
+                    product["_id"] = str(product["_id"])
+                    enriched_items.append({
+                        "productDetails": product,
+                        "qty": item.get("qty", 1)
+                    })
+                else:
+                    enriched_items.append({
+                        "productDetails": None,
+                        "qty": item.get("qty", 1)
+                    })
+            except Exception as e:
+                enriched_items.append({
+                    "productDetails": None,
+                    "qty": item.get("qty", 1)
+                })
+
+        order["items"] = enriched_items
         orders.append(order)
 
     return {
