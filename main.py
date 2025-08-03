@@ -89,18 +89,29 @@ def list_orders(
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    query = {"user_id": userid}
+    query = {}
+    if userid:
+        query["userId"] = userid
 
-    # Query database with pagination
+    total = orders_collection.count_documents(query)
+
     cursor = orders_collection.find(query).sort("_id").skip(offset).limit(limit)
+
     orders = []
     for order in cursor:
-        order["_id"] = str(order["_id"])  # Convert ObjectId to string
+        order["_id"] = str(order["_id"])
         orders.append(order)
 
+    next_offset = offset + limit if (offset + limit) < total else None
+    prev_offset = offset - limit if offset - limit >= 0 else None
+
     return {
-         "data": orders,
-        # "total": products_collection.count_documents(query),
-        "page": {"next":limit,"limit":0,"previous":-limit}
-        # "offset": offset,
+        "data": orders,
+        "total": total,
+        "page": {
+            "limit": limit,
+            "offset": offset,
+            "next": next_offset,
+            "previous": prev_offset
+        }
     }
